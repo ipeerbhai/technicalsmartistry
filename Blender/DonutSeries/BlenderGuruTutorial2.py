@@ -41,11 +41,21 @@ def SelectNearestVertext(dataItem, positionWanted):
     bm.select_mode |= {'VERT'}
     bm.select_flush_mode()
     bmesh.update_edit_mesh(dataItem)
+    pass
+
+## Get the bmesh object from edit mode 
+if bpy.context.object.mode == 'EDIT':
+    bpy.ops.object.editmode_toggle()
 
 
 ## Delete the base cube if it exists
 if bpy.data.scenes['Scene'].objects.find('Cube') >= 0:
     bpy.data.scenes['Scene'].objects.get('Cube').select_set(True)
+    bpy.ops.object.delete(use_global=False, confirm=False)
+
+## Delete the Donut if it exsts.
+if bpy.data.scenes['Scene'].objects.find('Donut') >= 0:
+    bpy.data.scenes['Scene'].objects.get('Donut').select_set(True)
     bpy.ops.object.delete(use_global=False, confirm=False)
     
 
@@ -82,8 +92,39 @@ if bpy.context.object.mode == 'OBJECT':
 bpy.context.scene.tool_settings.use_proportional_edit = True
 
 ## Let's make the lumps using the same technique Andrew did.
-## That means we need to select a vertex, then translate it along its normal
-
+## That means we need to select a vertex, then "move it"
 
 myData = bpy.context.object.data
-SelectNearestVertext(myData, (.07, 0, 0))
+bpy.ops.mesh.select_all(action='DESELECT') ## select nothing to clear any accidental mouse clicks in the object. 
+SelectNearestVertext(myData, (.07, 0, 0)) ## just a test -- we'll deslect it later.
+
+## There are 2 different ways to move a vertex -- translate and shrink_flatten ( aka move along normal ).
+## those are the "G" keys and "ALT-S" respectively in how Andrew does it.
+
+## Let's create an arrays of points, displacements, and proportions we can use for translation experimentation
+translate_pts = [(.07, 0, 0), (.09, .11, .09), (-.04, .04, 0.015)]
+translate_displacement = [(0.005, 0, 0), (0.005, 0.005, 0.005), (-.005, -0.005, 0.005)]
+translate_proportion = [0.035, 0.07, 0.05]
+
+## translate experiment
+for index, pt in enumerate(translate_pts):
+    bpy.ops.mesh.select_all(action='DESELECT')
+    SelectNearestVertext(myData, pt)
+    bpy.ops.transform.translate(value=translate_displacement[index], use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=translate_proportion[index])
+
+
+## Let's create an array of points, displacements, and proportions we can use for shrink_fatten
+sf_pts = [(-.07, -0.07, 0), (1, -1, 1), (1, -1, 0.015)]
+sf_displacement = [-0.001, 0.005, -0.003]
+sf_proportion = [0.04, 0.035, .024]
+
+## run the shrink_fatten transform
+for index, pt in enumerate(sf_pts):
+    bpy.ops.mesh.select_all(action='DESELECT')
+    SelectNearestVertext(myData, pt)
+    bpy.ops.transform.shrink_fatten(value=sf_displacement[index], use_even_offset=False, mirror=True, use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=sf_proportion[index], use_proportional_connected=False, use_proportional_projected=False)
+
+
+## Andrew's bonus -- he selected random points and shrink_fattened them
+#bpy.ops.mesh.select_random(seed=1)
+#bpy.ops.transform.shrink_fatten(value=.02, use_even_offset=False, mirror=True, use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=.02, use_proportional_connected=False, use_proportional_projected=False)
