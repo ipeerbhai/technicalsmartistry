@@ -28,5 +28,5 @@ model.compile(
 
 model.fit(inputTensor, inputTensor, epochs=1)
 
-## This will throw an out of memory exception
+## This will throw an out of memory exception (OOM when allocating tensor with shape[32,73809])
 foo = model.predict([inputTensor])
