@@ -17,16 +17,20 @@ inputTensor = tf.reshape(inputTensor, (73809,1))
 tf.random.set_seed(42)
 
 ## define a network
-model = tf.keras.Sequential()
-model.add(tf.keras.layers.Dense(73809, input_shape=(73809,1), activation=None))
+with tf.device('/CPU:0'):
+    model = tf.keras.Sequential()
+    model.add(tf.keras.layers.Dense(73809, input_shape=(73809,1), activation=None))
 
-model.compile(
-    loss="mean_squared_error",
-    optimizer="adam",
-    metrics=['mse']
-)
+    model.compile(
+        loss="mean_squared_error",
+        optimizer="adam",
+        metrics=['mse']
+    )
 
-model.fit(inputTensor, inputTensor, epochs=1)
+    model.fit(inputTensor, inputTensor, epochs=1, batch_size=1)
 
-## This will throw an out of memory exception (OOM when allocating tensor with shape[32,73809])
-foo = model.predict([inputTensor])
+    ## This will throw an out of memory exception (OOM when allocating tensor with shape[32,73809])
+    foo = model.predict([inputTensor])
+
+    ## convert foo back to a picture and display
+    
