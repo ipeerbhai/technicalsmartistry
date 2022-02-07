@@ -2,6 +2,22 @@ import bpy
 import bmesh
 import mathutils
 import pdb
+import math
+import operator
+import numpy as np
+
+## GeneratePointFromPolarPoint(r, theta, Z) creates an X, Y, Z tuple from a polar displacement radius, theta, and cartesian height
+def GeneratePointFromPolarPoint(r, theta, Z):
+    rads = math.radians(theta)
+    x = r * math.cos(rads)
+    y = r * math.sin(rads)
+    z = Z
+    return((x, y, z))
+
+## GetObjectData is just a shortcut to save typing to bpy...objects
+def GetObjectData(objectName):
+    target = bpy.data.scenes['Scene'].objects[objectName]
+    return(target)
 
 ## CreateKDTreeFromObject makes a KD tree, which is a data structure used to find spatial differences quickly.
 ## Parameters:
@@ -150,7 +166,7 @@ def MakeDonut():
         bpy.ops.mesh.select_all(action='DESELECT')
         SelectNearestVertext(myData, pt)
         bpy.ops.transform.shrink_fatten(value=sf_displacement[index], use_even_offset=False, mirror=True, use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=sf_proportion[index], use_proportional_connected=False, use_proportional_projected=False)
-    pass ## end MakeDonut
+    return(myData) ## end MakeDonut
 
 def MakeIcing():
     bpy.ops.mesh.select_all(action='DESELECT')
@@ -185,34 +201,146 @@ def MakeIcing():
 
     ## make the solidify modifier the first in the list of modifiers to reduce the "hat" ness.
     bpy.ops.object.modifier_move_to_index(modifier="Solidify", index=0)
-    pass        
+    return(myData)        
 
-## Make the base donut
-#DeleteAllMeshObjects()
-#MakeDonut()
-#MakeIcing()
+## Add detail to the icing.
+def DetailIcing(donut_tree, icing_tree):
+    ## deselect everything and select only the icing, make the icing the active object
+    if bpy.context.mode == 'EDIT_MESH':
+        bpy.ops.mesh.select_all(action='DESELECT') ## note, we have a different object to call select_all with -- the mesh
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.object.select_all(action='DESELECT')
+    icing = GetObjectData('Icing')
+    bpy.context.view_layer.objects.active = icing
+    icing.select_set(True)
+    icing_object = bpy.context.object.data ## need the icing as a mesh object for KD trees
 
-## Figure out how to select just the donut and put it into edit mode.
-## select nothing
-if bpy.context.mode != 'EDIT_MESH':
-    bpy.ops.object.select_all(action='DESELECT') ## select nothing
+    ## Set the solidify modifier to not show in edit mode, then go to edit mode.
+    bpy.context.object.modifiers["Solidify"].show_in_editmode = False
+    if bpy.context.object.mode != 'EDIT':
+        bpy.ops.object.editmode_toggle()
 
+    ## turn on snap to face with projection.
+    bpy.context.scene.tool_settings.use_snap = True
+    bpy.context.scene.tool_settings.snap_elements = {'FACE'}
+    bpy.context.scene.tool_settings.use_snap_project = True
+    
+    ## Andrew now has us pull in reference -- we'll skip that.
+    
+    ## Andrew now applies the subsurf modifier -- let's do that.
+    bpy.ops.object.modifier_move_to_index(modifier="Subdivision", index=0)
+    bpy.context.object.modifiers["Subdivision"].levels = 1
+    bpy.ops.object.editmode_toggle() ## back to object mode
+    bpy.ops.object.modifier_apply(modifier="Subdivision", report=True) ## applies viewport amount
+    
+    ## add another subsurf modifier after the solidify modifier
+    bpy.ops.object.modifier_add(type='SUBSURF')
+    bpy.context.object.modifiers["Subdivision"].levels = 1
+    bpy.ops.object.modifier_move_to_index(modifier="Subdivision", index=1)
+    
 
-def GetObjectData(objectName):
-    target = bpy.data.scenes['Scene'].objects[objectName]
-    return(target)
-
-
-donut = GetObjectData('Donut')
-bpy.context.view_layer.objects.active = donut
-donut.select_set(True)
-if bpy.context.object.mode != 'EDIT':
+    ## back to edit mode and select some vertices along the bottom
     bpy.ops.object.editmode_toggle()
 
-## The little section above sets a single mesh to active + edit, which makes
-## bpy.context.object.data now what I need to select points.
-## now, let's select the loop.
+    ## turn on snap to face with projection.  This seems to do nothing in python.  You'd have to manually tree walk and adjust points.
+    ## This would be "incomplete API" behavior, I think.
+    bpy.context.scene.tool_settings.use_snap = True
+    bpy.context.scene.tool_settings.snap_elements = {'FACE'}
+    bpy.context.scene.tool_settings.use_snap_project = True
+    
+    ## let's generate equal divisions for a wave superimposed on the icing
+    divions = 4
+    for thetaIndex in range(divions):
+        pt1 = np.asarray(GeneratePointFromPolarPoint(.07, thetaIndex*(360/divions), -0.01)) ## 7cm from center, 22 degrees of rotation around 0,0, 1 cm down
+        bpy.ops.mesh.select_all(action='DESELECT') ## Don't forget this, or the points stay selected, and displacement becomes cumalative!
+        SelectNearestVertext(icing_object, pt1) ## select the icing vertex
+        
+        ## find the selected point
+        selectedPt = icing_tree.find(pt1)
+        tp1 = pt1 - np.asarray((0, 0, -0.01)) ## What's a point near pt1, but 0.05 down.
+        fi = donut_tree.find(tp1) ## What's the nearest vertex on the donut near that displaced point.
+        dp1 = np.asarray(selectedPt[0]) - np.asarray(fi[0]) ## What's the displacement needed to move from the icing point to the donut point?
+        
+        ## let's try displacing it down and see what happens.
+        bpy.ops.transform.translate(value=dp1, use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=0.05)
 
-SelectNearestSetOfVertices(bpy.context.object.data, (1, 0, 0), 2)
-bpy.ops.mesh.loop_multi_select(ring=False)
+        #bpy.ops.transform.translate(value=dp1, orient_axis_ortho='X', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', mirror=True, use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=0.0355841, use_proportional_connected=False, use_proportional_projected=False)
+    
+    ## let's create the little drippings.
+    divions = 7
+    bpy.ops.mesh.select_all(action='DESELECT') ## Don't forget this, or the points stay selected, and displacement becomes cumalative!
+    for thetaIndex in range(divions):
+        pt1 = np.asarray(GeneratePointFromPolarPoint(.07, thetaIndex*(360/divions), -0.01)) ## 7cm from center, 22 degrees of rotation around 0,0, 1 cm down
+        SelectNearestSetOfVertices(icing_object, pt1,3 ) ## select vertices for extrusion
+    bpy.ops.mesh.extrude_region_move(MESH_OT_extrude_region={"use_normal_flip":False, "use_dissolve_ortho_edges":False, "mirror":False}, TRANSFORM_OT_translate={"value":(-0.00133574, -9.8661e-05, -0.0146044), "orient_axis_ortho":'X', "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
+    
+    ## exit edit mode, select nothing, return
+    bpy.ops.object.editmode_toggle()
+    bpy.ops.object.select_all(action='DESELECT')
+    pass
 
+def DetailDonut(donut_object):
+    ## make sure to deselect everything.
+    if bpy.context.mode == 'EDIT_MESH':
+        bpy.ops.mesh.select_all(action='DESELECT') ## note, we have a different object to call select_all with -- the mesh
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.object.select_all(action='DESELECT')
+    
+
+    ## select the donut and make it active
+    donut = GetObjectData('Donut')
+    bpy.context.view_layer.objects.active = donut
+    donut.select_set(True)
+
+    ## add and apply a subdiv surf modifier of 1 viewport level.
+    bpy.ops.object.modifier_add(type='SUBSURF')
+    bpy.context.object.modifiers["Subdivision"].levels = 1
+    bpy.ops.object.modifier_move_to_index(modifier="Subdivision", index=1)
+    bpy.ops.object.modifier_apply(modifier="Subdivision", report=True) ## This invalidates the donut kd_tree, as I added vertices.  Ooops.
+
+    ## select the ring around the middle.
+    SelectNearestSetOfVertices(bpy.context.object.data, (1, 0, 0), 2)
+    bpy.ops.mesh.loop_multi_select(ring=False)
+
+    ## shrink the center
+    bpy.ops.transform.shrink_fatten(value=-0.005, use_even_offset=False, mirror=True, use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=.01, use_proportional_connected=False, use_proportional_projected=False)
+    
+    ## fatten the bottom a bit
+    bpy.ops.mesh.select_all(action='DESELECT')
+    targetPt = GeneratePointFromPolarPoint(.07, 1, -0.03)
+    SelectNearestSetOfVertices(bpy.context.object.data, targetPt, 2)
+    bpy.ops.mesh.loop_multi_select(ring=False)
+    bpy.ops.transform.shrink_fatten(value=0.0033, use_even_offset=False, mirror=True, use_proportional_edit=True, proportional_edit_falloff='SMOOTH', proportional_size=.02, use_proportional_connected=False, use_proportional_projected=False)
+    
+    ## deselect and exit edit mode
+    bpy.ops.mesh.select_all(action='DESELECT')
+    bpy.ops.object.editmode_toggle()
+    bpy.ops.object.select_all(action='DESELECT')
+    pass
+        
+## Make the base donut
+DeleteAllMeshObjects()
+donut_object = MakeDonut()
+icing_object = MakeIcing()
+
+## get the KD tree for the donut
+donut_tree = CreateKDTreeFromObject(donut_object)
+icing_tree = CreateKDTreeFromObject(icing_object)
+
+## add some more detail to the icing
+DetailIcing(donut_tree, icing_tree)
+
+## Make the center ring of the donut a little smaller
+DetailDonut(donut_object)
+
+## put the shrinkwrap modifier on the icing.
+icing = GetObjectData('Icing')
+bpy.context.view_layer.objects.active = icing
+icing.select_set(True)
+bpy.ops.object.modifier_add(type='SHRINKWRAP')
+bpy.context.object.modifiers["Shrinkwrap"].target = bpy.data.objects["Donut"]
+bpy.ops.object.modifier_move_to_index(modifier="Shrinkwrap", index=0)
+bpy.ops.object.modifier_apply(modifier="Shrinkwrap", report=True)
+
+## deselect all
+bpy.ops.object.select_all(action='DESELECT')
