@@ -32,7 +32,7 @@ link = links.new(node_environment.outputs["Color"], node_background.inputs["Colo
 link = links.new(node_background.outputs["Background"], node_output.inputs["Surface"])
 
 ## load the EXF/HDR into the environment node.
-node_environment.image = bpy.data.images.load("F:/github/technicalsmartistry/Blender/SceneBasics/amphitheatre_zanzibar_fort_4k.exr")
+node_environment.image = bpy.data.images.load("C:/github/technicalsmartistry/Blender/SceneBasics/amphitheatre_zanzibar_fort_4k.exr")
 
 ### Advanced -- change the XYZ position of the EXR
 node_vector = tree_nodes.new(type='ShaderNodeMapping')
