@@ -4,6 +4,8 @@ from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.models import Model
 import numpy as np
 
+
+
 ## load the picture
 pictureFile = "./RandomSmallPic.png" 
 inputImage = cv2.imread(pictureFile) # 139*177*3 = 71421
