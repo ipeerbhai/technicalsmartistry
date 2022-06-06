@@ -23,7 +23,6 @@ def ImportGLTF(filePath="", fileName=""):
 
     ## Import the actual GLTF
     file = filePath + os.sep + fileName
-    #resultStatus = bpy.ops.import_scene.gltf(file, files=[{"name":fileName, "name":fileName}], loglevel=50)
     resultStatus = bpy.ops.import_scene.gltf(filepath=file, files=[{"name":fileName, "name":fileName}], loglevel=50)
 
     ## Save the selected objects array from import.
