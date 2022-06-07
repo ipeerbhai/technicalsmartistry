@@ -36,7 +36,7 @@ class Importers():
 
     ## ImportFromBlendFile takes objects, collections, meshes, or other items from 
     ## blend files and imports them into the existing scene
-    def ImportFromBlendFile(blendFile="", objectType="Object", objectName=""):
+    def ImportFromBlendFile(self, blendFile="", objectType="Object", objectName=""):
         if blendFile == "" or objectName == "":
             return (None, "Invalid blend file or object name")
         
