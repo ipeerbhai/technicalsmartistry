@@ -1,4 +1,4 @@
-## initial detail to icing -- adding shrinkwrap modifier, thickening mesh via modifiers, etc.
+## Rendering?  PBR?  Let's see.
 
 import bpy
 import bmesh
@@ -7,6 +7,24 @@ import pdb
 import math
 import operator
 import numpy as np
+
+## GenerateStrokePtFromKDTree generates a single mouse stroke from a pt
+def GenerateStrokePtFromKDTree(tree, location, is_start=False):
+    ## find the vertex on the tree nearest the target point
+    vertexInfo = tree.find(location)
+    pt = np.array(vertexInfo[0])
+
+    ## generate a single point in a stroke path 
+    path_point = {"name": "defaultStroke",
+            "mouse" : (0, 0),
+            "pen_flip" : False,
+            "is_start": is_start,
+            "location": pt,
+            "pressure": 1.0,
+            "time": 1.0,
+            "size" : 100.0
+            }
+    return(path_point)
 
 ## GeneratePointFromPolarPoint(r, theta, Z) creates an X, Y, Z tuple from a polar displacement radius, theta, and cartesian height
 def GeneratePointFromPolarPoint(r, theta, Z):
@@ -82,9 +100,14 @@ def SelectNearestVertext(dataItem, positionWanted):
 
 ## DeleteAllMeshObjects deletes all objects of type 'MESH'
 def DeleteAllMeshObjects():
+
     ## We want to be in object mode and select all
-    if bpy.context.object.mode == 'EDIT':
-        bpy.ops.object.editmode_toggle()
+    match bpy.context.object.mode:
+        case 'EDIT':
+            bpy.ops.object.editmode_toggle()
+        case 'SCULPT':
+             bpy.ops.sculpt.sculptmode_toggle()
+
     bpy.ops.object.select_all(action='SELECT')
     
     ## deselect anything that isn't a mesh
@@ -319,30 +342,57 @@ def DetailDonut(donut_object):
     bpy.ops.object.editmode_toggle()
     bpy.ops.object.select_all(action='DESELECT')
     pass
+
+def EditDonutAndIciningMeshes(donut_object, icing_object):
+    ## get the KD tree for the donut
+    donut_tree = CreateKDTreeFromObject(donut_object)
+    icing_tree = CreateKDTreeFromObject(icing_object)
+
+    ## add some more detail to the icing
+    DetailIcing(donut_tree, icing_tree)
+
+    ## Make the center ring of the donut a little smaller
+    DetailDonut(donut_object)
+
+    ## put the shrinkwrap modifier on the icing.
+    icing = GetObjectData('Icing')
+    bpy.context.view_layer.objects.active = icing
+    icing.select_set(True)
+    bpy.ops.object.modifier_add(type='SHRINKWRAP')
+    bpy.context.object.modifiers["Shrinkwrap"].target = bpy.data.objects["Donut"]
+    bpy.ops.object.modifier_move_to_index(modifier="Shrinkwrap", index=0)
+    bpy.ops.object.modifier_apply(modifier="Shrinkwrap", report=True)
+
+    ## deselect all
+    bpy.ops.object.select_all(action='DESELECT')
+
         
 ## Make the base donut
 DeleteAllMeshObjects()
+
+## generate the base objects
 donut_object = MakeDonut()
 icing_object = MakeIcing()
 
-## get the KD tree for the donut
-donut_tree = CreateKDTreeFromObject(donut_object)
-icing_tree = CreateKDTreeFromObject(icing_object)
+## add mesh details to both donut and icing per Andrew's video 4.
+EditDonutAndIciningMeshes(donut_object, icing_object)
 
-## add some more detail to the icing
-DetailIcing(donut_tree, icing_tree)
-
-## Make the center ring of the donut a little smaller
-DetailDonut(donut_object)
-
-## put the shrinkwrap modifier on the icing.
+## Apply all modifiers
 icing = GetObjectData('Icing')
 bpy.context.view_layer.objects.active = icing
 icing.select_set(True)
-bpy.ops.object.modifier_add(type='SHRINKWRAP')
-bpy.context.object.modifiers["Shrinkwrap"].target = bpy.data.objects["Donut"]
-bpy.ops.object.modifier_move_to_index(modifier="Shrinkwrap", index=0)
-bpy.ops.object.modifier_apply(modifier="Shrinkwrap", report=True)
+bpy.ops.object.modifier_apply(modifier="Solidify", report=True)
+bpy.ops.object.modifier_apply(modifier="Subdivision", report=True)
 
-## deselect all
-bpy.ops.object.select_all(action='DESELECT')
+## Switch to a sculpting tool and drag it across the icing?
+bpy.ops.object.mode_set(mode='SCULPT')
+bpy.ops.wm.tool_set_by_id(name="builtin_brush.Draw")
+
+## define a stroke to sculpt
+stroke = [{ "name": "defaultStroke",
+                            "mouse" : (0.0, 0.0),
+                            "pen_flip" : False,
+                            "is_start": True,
+                            "location": (0, 0, 0),
+                            "pressure": 1.0,
+                            "time": 1.0}]

@@ -1,3 +1,5 @@
+## basic modelling -- simple shapes, vertex selection, shading and subdivision
+
 import bpy
 import bmesh
 import mathutils

@@ -1,3 +1,11 @@
+## Sculpiting the icing.  I'm going to skip this one, as it doesn't lend itself well to code.
+## the workflow did end up working once I figured out the actual stroke and viewport definitions (lost that code to bad git command.  doh)
+## But it was viewport centric -- that is viewport angles mattered, tool selection, etc, rather than perfectly repeatable in mesh space.
+## given that code can select vertices and push/pull them individually, sculpting felt imprecise via the API.
+
+## To sculpt in code: Just generate a set of points as a "brush".  Select vertices nearest the point.  Push/pull those vertices to sculpt.
+## That's more in line with code thinking.
+
 import bpy
 import bmesh
 import mathutils

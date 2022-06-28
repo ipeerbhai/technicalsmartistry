@@ -1,3 +1,5 @@
+## Creating icing by further mesh modification, part duplication and separation.
+
 import bpy
 import bmesh
 import mathutils

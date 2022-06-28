@@ -1,0 +1,9 @@
+Installation / setup
+What does it take to get started with NVidea Omniverse?
+1. Download and install Omniverse Launcher.
+2. Install NVidea Cache, Drive, Create, and a local Nucleus installation.
+
+
+
+Core Concepts:
+
