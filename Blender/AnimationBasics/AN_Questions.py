@@ -24,6 +24,8 @@ class MeshUtilities():
     ## DeleteAllMeshObjects deletes all objects of type 'MESH'
     def DeleteAllMeshObjects(self):
         ## We want to be in object mode and select all
+        if bpy.context.object == None:
+            pass
         match bpy.context.object.mode:
             case 'EDIT':
                 bpy.ops.object.editmode_toggle()
@@ -85,15 +87,17 @@ class MeshUtilities():
 
 ## A class to create meshes
 class MeshPrimitives():
-    def IcoSphere(self, radius=1, position=[0, 0, 0]):
-        pass
+    def IcoSphere(self, radius=1, location=(0, 0, 0)):
+        sphere = bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        return(sphere)
 
-    def UVSphere(self, radius=1, position=[0, 0, 0]):
-        pass
+    def UVSphere(self, radius=1, location=(0, 0, 0)):
+        sphere = bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        return(sphere)
 
 ## A class to create bones, append them to meshes, and create named control shapes
 class SkeletonUtilities():
-    def AddBoneToMesh(self, boneSize=[1, 1, 1], mesh):
+    def AddBoneToMesh(self, mesh, boneSize=(1, 1, 1)):
         pass
 
 
@@ -127,14 +131,14 @@ class BasicAnimationQuestions():
 
         ## clean up the world
         self.meshUtils.DeleteAllMeshObjects()
-        WorldUtilities.SetupWorld()
+        self.worldUtils.SetupWorld()
         pass
 
     ## CreateHeadMeshes creates three spheres to represent the head of some toy thing.
     def CreateHeadMeshes(self):
         head = self.meshPrims.IcoSphere(radius=5)
-        leftEye = self.meshPrims.UVSphere(radius=1, position=(0, 4, 0))
-        rightEye = self.meshPrims.UVSphere(radius=1, position=(0, -4, 0))
+        leftEye = self.meshPrims.UVSphere(radius=1, location=(0, 4, 0))
+        rightEye = self.meshPrims.UVSphere(radius=1, location=(0, -4, 0))
 
         primBody = {'head': head, 'leftEye': leftEye, 'rightEye': rightEye}
         return(primBody)
