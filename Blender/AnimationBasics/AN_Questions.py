@@ -25,7 +25,7 @@ class MeshUtilities():
     def DeleteAllMeshObjects(self):
         ## We want to be in object mode and select all
         if bpy.context.object == None:
-            pass
+            return
         match bpy.context.object.mode:
             case 'EDIT':
                 bpy.ops.object.editmode_toggle()
@@ -88,11 +88,13 @@ class MeshUtilities():
 ## A class to create meshes
 class MeshPrimitives():
     def IcoSphere(self, radius=1, location=(0, 0, 0)):
-        sphere = bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        sphere = bpy.context.object.data
         return(sphere)
 
     def UVSphere(self, radius=1, location=(0, 0, 0)):
-        sphere = bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        sphere = bpy.context.object.data
         return(sphere)
 
 ## A class to create bones, append them to meshes, and create named control shapes
@@ -136,9 +138,9 @@ class BasicAnimationQuestions():
 
     ## CreateHeadMeshes creates three spheres to represent the head of some toy thing.
     def CreateHeadMeshes(self):
-        head = self.meshPrims.IcoSphere(radius=5)
-        leftEye = self.meshPrims.UVSphere(radius=1, location=(0, 4, 0))
-        rightEye = self.meshPrims.UVSphere(radius=1, location=(0, -4, 0))
+        head = self.meshPrims.IcoSphere(radius=4)
+        leftEye = self.meshPrims.UVSphere(radius=1.5, location=(0, 4, 0))
+        rightEye = self.meshPrims.UVSphere(radius=1.5, location=(0, -4, 0))
 
         primBody = {'head': head, 'leftEye': leftEye, 'rightEye': rightEye}
         return(primBody)
@@ -147,6 +149,7 @@ class BasicAnimationQuestions():
     def HowDoIattachABoneToAUVSphere(self):
         self.meshUtils.DeleteAllMeshObjects()
         character = self.CreateHeadMeshes()
+        print(character['leftEye'])
         return(character)
 
 ## run the question
