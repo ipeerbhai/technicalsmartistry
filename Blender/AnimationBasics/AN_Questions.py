@@ -84,25 +84,50 @@ class MeshUtilities():
         bmesh.update_edit_mesh(dataItem)
         pass ## Just to look pretty
 
+    ## GetCenterPt takes a mesh, and gives you the mesh's box center.
+    def GetCenterPt(self, mesh):
+        pass
+
 
 ## A class to create meshes
 class MeshPrimitives():
     def IcoSphere(self, radius=1, location=(0, 0, 0)):
         bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
         sphere = bpy.context.object.data
+        bpy.context.selected_objects[0].name = sphere.name
         return(sphere)
 
     def UVSphere(self, radius=1, location=(0, 0, 0)):
         bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
         sphere = bpy.context.object.data
+        bpy.context.selected_objects[0].name = sphere.name
         return(sphere)
 
 ## A class to create bones, append them to meshes, and create named control shapes
 class SkeletonUtilities():
-    def AddBoneToMesh(self, mesh, boneSize=(1, 1, 1)):
+
+    ## ClearAll deletes all armitures
+    def ClearAll(self):
         pass
 
+    ## AddArmitureToMesh adds a single armiture/bone to a mesh at the center of the mesh and auto-weights mesh vertices to it.
+    def AddArmitureToMesh(self, mesh, boneSize=(1, 1, 1)):
 
+        ## find the center of the mesh
+        center = (bpy.data.objects[mesh.name].location.x, bpy.data.objects[mesh.name].location.y, bpy.data.objects[mesh.name].location.z)
+        bpy.ops.object.armature_add(enter_editmode=False, align='WORLD', location=center, scale=boneSize)
+        
+        ## Create the armiture and name it
+        armiture = bpy.context.object.data
+        bpy.context.selected_objects[0].name = armiture.name
+
+        ## select the mesh and the armiture
+        world = WorldUtilities()
+        world.SelectItems([mesh, armiture])
+
+        ## Parent the mesh to the armiture
+        bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+        return(armiture)
 
 ## A class to help add/create textures to a mesh
 class TextureUtilities():
@@ -120,6 +145,22 @@ class WorldUtilities():
     def SetupWorld(self, system='METRIC', unit='METERS'):
         bpy.context.scene.unit_settings.system = system
         bpy.context.scene.unit_settings.length_unit = unit
+        pass
+
+    def DeselectAll(self):
+        bpy.ops.object.select_all(action='DESELECT')
+        pass
+
+    def SelectItems(self, items):
+        self.DeselectAll()
+        self.SelectAdditionalItems(items)
+        pass
+
+    def SelectAdditionalItems(self, items):
+        for toselectItem in items:
+            bpy.data.scenes['Scene'].objects.get(toselectItem.name).select_set(True)
+        pass
+
      
 ###
 ## Main Questions
@@ -139,17 +180,19 @@ class BasicAnimationQuestions():
     ## CreateHeadMeshes creates three spheres to represent the head of some toy thing.
     def CreateHeadMeshes(self):
         head = self.meshPrims.IcoSphere(radius=4)
-        leftEye = self.meshPrims.UVSphere(radius=1.5, location=(0, 4, 0))
-        rightEye = self.meshPrims.UVSphere(radius=1.5, location=(0, -4, 0))
+        leftEye = self.meshPrims.UVSphere(radius=1.5, location=(0, -4, 0))
+        rightEye = self.meshPrims.UVSphere(radius=1.5, location=(0, 4, 0))
 
         primBody = {'head': head, 'leftEye': leftEye, 'rightEye': rightEye}
         return(primBody)
 
 
+    ## How do I create an armiture and add a bone to a single mesh?
     def HowDoIattachABoneToAUVSphere(self):
         self.meshUtils.DeleteAllMeshObjects()
         character = self.CreateHeadMeshes()
-        print(character['leftEye'])
+        skel = SkeletonUtilities()
+        skel.AddArmitureToMesh(character['leftEye'])
         return(character)
 
 ## run the question
