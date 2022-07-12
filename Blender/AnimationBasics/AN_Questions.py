@@ -91,6 +91,12 @@ class MeshUtilities():
 
 ## A class to create meshes
 class MeshPrimitives():
+    def Circle(self, radius=1, location=(0, 0, 0)):
+        bpy.ops.mesh.primitive_circle_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
+        circle = bpy.context.object.data
+        bpy.context.selected_objects[0].name = circle.name
+        return(circle)
+
     def IcoSphere(self, radius=1, location=(0, 0, 0)):
         bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
         sphere = bpy.context.object.data
@@ -107,7 +113,16 @@ class MeshPrimitives():
 class SkeletonUtilities():
 
     ## ClearAll deletes all armitures
-    def ClearAll(self):
+    def DeleteAllArmitureObjects(self, scene='Scene'):
+        world = WorldUtilities()
+        world.DeselectAll()
+        allObjects = bpy.data.scenes['Scene'].objects
+        for object in allObjects:
+            if object.type == 'ARMATURE':
+                ## select the object
+                object.select_set(True)
+        
+        world.DeleteSelected()
         pass
 
     ## AddArmitureToMesh adds a single armiture/bone to a mesh at the center of the mesh and auto-weights mesh vertices to it.
@@ -147,6 +162,10 @@ class WorldUtilities():
         bpy.context.scene.unit_settings.length_unit = unit
         pass
 
+    def DeleteSelected(self):
+        bpy.ops.object.delete(use_global=False, confirm=False)
+        pass
+
     def DeselectAll(self):
         bpy.ops.object.select_all(action='DESELECT')
         pass
@@ -156,10 +175,29 @@ class WorldUtilities():
         self.SelectAdditionalItems(items)
         pass
 
-    def SelectAdditionalItems(self, items):
+    def SelectAdditionalItems(self, items, scene='Scene'):
         for toselectItem in items:
-            bpy.data.scenes['Scene'].objects.get(toselectItem.name).select_set(True)
+            bpy.data.scenes[scene].objects.get(toselectItem.name).select_set(True)
         pass
+
+    def SetSceneKeysToObjectDataNames(self, scene='Scene'):
+        allObjects = bpy.data.scenes[scene].objects
+        for object in allObjects:
+            object.name = object.data.name
+        pass
+
+    def SetSceneObjectDataNamesToSeneNames(self, scene='Scene'):
+        allObjects = bpy.data.scenes[scene].objects
+        for object in allObjects:
+            object.data.name = object.name
+        pass
+
+    ## In blender, objects are typed.  The world/scene objects are a different type than the same object as a Mesh, bone, etc
+    def GetWorldObjectFromObject(self, object, scene='Scene'):
+         target = bpy.data.scenes[scene].objects.get(object.name)
+         return(target)
+
+
 
      
 ###
@@ -171,9 +209,11 @@ class BasicAnimationQuestions():
         self.worldUtils = WorldUtilities()
         self.meshPrims = MeshPrimitives()
         self.meshUtils = MeshUtilities()
+        self.skelUtils = SkeletonUtilities()
 
         ## clean up the world
         self.meshUtils.DeleteAllMeshObjects()
+        self.skelUtils.DeleteAllArmitureObjects()
         self.worldUtils.SetupWorld()
         pass
 
@@ -189,10 +229,34 @@ class BasicAnimationQuestions():
 
     ## How do I create an armiture and add a bone to a single mesh?
     def HowDoIattachABoneToAUVSphere(self):
+        ## clear everything, draw the character, create a bone, and parent an eye to the created bone.
         self.meshUtils.DeleteAllMeshObjects()
+        self.skelUtils.DeleteAllArmitureObjects()
         character = self.CreateHeadMeshes()
-        skel = SkeletonUtilities()
-        skel.AddArmitureToMesh(character['leftEye'])
+        bone = self.skelUtils.AddArmitureToMesh(character['leftEye'])
+        self.worldUtils.SetSceneObjectDataNamesToSeneNames()
+
+        ## Blender doesn't support points as meshes, so create a very small circle as a control point and aim the bone at the circle.  
+        reticle = self.meshPrims.Circle(radius=0.01, location=(0, 0, 5))
+        reticle.name = 'Reticle'
+
+        ## update the world to match data names
+        #self.worldUtils.SetSceneKeysToObjectDataNames()
+
+        ## add a tracking constraint to the bone.
+        self.worldUtils.DeselectAll()
+        self.worldUtils.SelectItems([bone])
+        bpy.ops.outliner.item_activate(deselect_all=True)
+
+        #bpy.ops.object.constraint_add(type='TRACK_TO')
+        ## bpy.context.object.constraints["Track To"].target = self.worldUtils.GetWorldObjectFromObject(reticle)
+
+
+
+
+
+
+
         return(character)
 
 ## run the question
