@@ -109,17 +109,26 @@ class MeshPrimitives():
 
 ## A class to create bones, append them to meshes, and create named control shapes
 class SkeletonUtilities():
+    def __init__(self):
+        self.worldUtils = WorldUtilities()
+        pass
+
+    def CreateBone(self):
+        self.worldUtils.DeselectAll()
+        bpy.ops.object.armature_add(enter_editmode=False, align='WORLD')
+        bone = bpy.context.object.data
+        bpy.context.selected_objects[0].name = bone.name
+        return(bone)
 
     ## ClearAll deletes all armitures
     def DeleteAllArmitureObjects(self, scene='Scene'):
-        world = WorldUtilities()
-        world.DeselectAll()
+        self.worldUtils.DeselectAll()
         allObjects = bpy.data.scenes['Scene'].objects
         for object in allObjects:
             if object.type == 'ARMATURE':
                 ## select the object
                 object.select_set(True)
-        world.DeleteSelected()
+        self.worldUtils.DeleteSelected()
         pass
 
     ## AddArmitureToMesh adds a single armiture/bone to a mesh at the center of the mesh and auto-weights mesh vertices to it.
@@ -134,8 +143,7 @@ class SkeletonUtilities():
         bpy.context.selected_objects[0].name = armiture.name
 
         ## select the mesh and the armiture
-        world = WorldUtilities()
-        world.SelectItems([mesh, armiture])
+        self.worldUtils.SelectItems([mesh, armiture])
 
         ## Parent the mesh to the armiture
         bpy.ops.object.parent_set(type='ARMATURE_AUTO')
@@ -265,6 +273,18 @@ class BasicAnimationQuestions():
     
     ## How do I squish a ball?
     def HowdDoISquishABall(self):
+        ## step 1 -- create a ball and a bone
+        ball = self.meshPrims.IcoSphere()
+        bone = self.skelUtils.CreateBone()
+
+        ## step 2 -- figure out how to assign weights to vertices.
+        self.worldUtils.SelectItems([ball, bone])
+        bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+
+        ## how do I figure out the vertex weights?
+        ## maybe something to do with the bpy.types.VertexGroup class?
+
+ 
         pass
 
 ## run the question
