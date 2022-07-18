@@ -7,10 +7,26 @@ import math
 import operator
 import numpy as np
 import os
-import enum
+from enum import Enum
+
+class BoneTypes(Enum):
+    Deform  = 1
+    Control = 2
+    Helper  = 3
+
+class SubSurfModifierMethods(Enum):
+    Simple = 'SIMPLE'
+    CatmullCkark = 'CATMULL_CLARK'
+
+## Notes ##
+# Scale is "resize" in blender's API.
 
 ## MeshUtilities is a class with some helper functions for working with meshes as arrays of points.
 class MeshUtilities():
+    def __init__(self):
+        self.worldUtils = WorldUtilities()
+        pass
+
     ## CreateKDTreeFromObject makes a KD tree, which is a data structure used to find spatial differences quickly.
     ## Parameters:
     ##  dataItem -- the 'MESH' of the item we want to generate a KD tree from.
@@ -84,14 +100,41 @@ class MeshUtilities():
         bmesh.update_edit_mesh(dataItem)
         pass ## Just to look pretty
 
+    ## IncreaseVertexCount adds vertices to the mesh around the entire mesh by adding a subdivide modifier and applying the modifier.
+    def IncreaseVertexCount(self, mesh, method=SubSurfModifierMethods.Simple, level=1):
+        self.worldUtils.SetObjectMode()
+        self.worldUtils.SelectItems([mesh])
+        if bpy.context.object.modifiers.find("Subdivision") < 0:
+            bpy.ops.object.modifier_add(type='SUBSURF')
+
+        bpy.context.object.modifiers["Subdivision"].subdivision_type = method.value
+        bpy.context.object.modifiers["Subdivision"].levels = level
+        bpy.context.object.modifiers["Subdivision"].render_levels = level
+
+        bpy.ops.object.modifier_apply(modifier="Subdivision", report=True) ## applies viewport amount
+        pass
+
 ## A class to create meshes
 class MeshPrimitives():
+    def __init__(self):
+        self.worldUtils = WorldUtilities()
+        pass
+
     ## Circle is a simple circle
     def Circle(self, radius=1, location=(0, 0, 0)):
         bpy.ops.mesh.primitive_circle_add(radius=radius, enter_editmode=False, align='WORLD', location=location, scale=(1, 1, 1))
         circle = bpy.context.object.data
         bpy.context.selected_objects[0].name = circle.name
         return(circle)
+    
+
+    ## Cylinder is a simple cylinder with radius r and height h
+    def Cylinder(self, r=1, h=2):
+        self.worldUtils.DeselectAll()
+        bpy.ops.mesh.primitive_cylinder_add(radius=r, depth=h, enter_editmode=False, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+        cyl = bpy.context.object.data
+        bpy.context.selected_objects[0].name = cyl.name
+        return(cyl)
 
     ## IvoShphere is a sphere with regularly placed vertices
     def IcoSphere(self, radius=1, location=(0, 0, 0)):
@@ -107,21 +150,22 @@ class MeshPrimitives():
         bpy.context.selected_objects[0].name = sphere.name
         return(sphere)
 
-## A class to create bones, append them to meshes, and create named control shapes
+## A class to create Armatures/bones, append them to meshes, and create named control shapes
 class SkeletonUtilities():
     def __init__(self):
         self.worldUtils = WorldUtilities()
         pass
 
-    def CreateBone(self):
+    def CreateArmature(self, type=BoneTypes.Deform):
+        ## create an Armature
         self.worldUtils.DeselectAll()
         bpy.ops.object.armature_add(enter_editmode=False, align='WORLD')
         bone = bpy.context.object.data
         bpy.context.selected_objects[0].name = bone.name
         return(bone)
 
-    ## ClearAll deletes all armitures
-    def DeleteAllArmitureObjects(self, scene='Scene'):
+    ## ClearAll deletes all Armatures
+    def DeleteAllArmatureObjects(self, scene='Scene'):
         self.worldUtils.DeselectAll()
         allObjects = bpy.data.scenes['Scene'].objects
         for object in allObjects:
@@ -131,23 +175,37 @@ class SkeletonUtilities():
         self.worldUtils.DeleteSelected()
         pass
 
-    ## AddArmitureToMesh adds a single armiture/bone to a mesh at the center of the mesh and auto-weights mesh vertices to it.
-    def AddArmitureToMesh(self, mesh, boneSize=(1, 1, 1)):
+    ## AddNewArmatureToMesh adds a single Armature/bone to a mesh at the center of the mesh and auto-weights mesh vertices to it.
+    def AddNewArmatureToMesh(self, mesh, boneSize=(1, 1, 1)):
 
         ## find the center of the mesh
         center = (bpy.data.objects[mesh.name].location.x, bpy.data.objects[mesh.name].location.y, bpy.data.objects[mesh.name].location.z)
         bpy.ops.object.armature_add(enter_editmode=False, align='WORLD', location=center, scale=boneSize)
         
-        ## Create the armiture and name it
-        armiture = bpy.context.object.data
-        bpy.context.selected_objects[0].name = armiture.name
+        ## Create the Armature and name it
+        Armature = bpy.context.object.data
+        bpy.context.selected_objects[0].name = Armature.name
 
-        ## select the mesh and the armiture
-        self.worldUtils.SelectItems([mesh, armiture])
+        ## select the mesh and the Armature
+        self.worldUtils.SelectItems([mesh, Armature])
 
-        ## Parent the mesh to the armiture
+        ## Parent the mesh to the Armature
         bpy.ops.object.parent_set(type='ARMATURE_AUTO')
-        return(armiture)
+        return(Armature)
+    
+    ## Subdivide makes a single armature/bone into many linear bones.
+    def Subdivide(self, armature, count=1):
+        self.worldUtils.SetObjectMode()
+        self.worldUtils.SelectItems([armature])
+        bpy.ops.object.editmode_toggle() ## this selects the tail of the bone -- gotta select the bone itself.
+        armature.edit_bones[0].select = True
+        bpy.ops.armature.subdivide(number_cuts=count)
+        bpy.ops.object.editmode_toggle()
+        pass
+
+    ## BindExistingArmatureToMesh binds an existing armature to a mesh
+    def BindExistingArmatureToMesh(self, armature, mesh):
+        pass
 
 ## A class to help add/create textures to a mesh
 class TextureUtilities():
@@ -162,6 +220,12 @@ class TextureUtilities():
 
 ## Some basic utilites that apply to the basic world
 class WorldUtilities():
+
+    ## ActivateObject sets the passed in object to active
+    ## The bpy.context.scene.active_object needs to be set to the data block of the active object?
+    def ActivateObject(self, object):
+        bpy.context.scene.active_object = object
+        pass
 
     ## SetupWorld sets the world's unit system
     def SetupWorld(self, system='METRIC', unit='METERS'):
@@ -215,6 +279,20 @@ class WorldUtilities():
         worldRef = self.GetWorldObjectFromObject(object)
         worldRef.hide_render = True
         pass
+
+    ## ScaleSelectedObject scales whatever is selected
+    def ScaleSelectedObject(self, scale=(1, 1, 1)):
+        bpy.ops.transform.resize(value=scale)
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        pass
+
+
+    ## SetObjectMode selects nothing and puts the system in object mode.
+    def SetObjectMode(self):
+        self.DeselectAll()
+        bpy.ops.object.mode_set()
+        pass
+
      
 ###
 ## Main Questions
@@ -229,7 +307,7 @@ class BasicAnimationQuestions():
 
         ## clean up the world
         self.meshUtils.DeleteAllMeshObjects()
-        self.skelUtils.DeleteAllArmitureObjects()
+        self.skelUtils.DeleteAllArmatureObjects()
         self.worldUtils.SetupWorld()
         pass
 
@@ -247,7 +325,7 @@ class BasicAnimationQuestions():
     def HowDoIAnimateEyes(self):
         ## clear everything, draw the character, create a bone, and parent an eye to the created bone.
         self.meshUtils.DeleteAllMeshObjects()
-        self.skelUtils.DeleteAllArmitureObjects()
+        self.skelUtils.DeleteAllArmatureObjects()
         character = self.CreateHeadMeshes()
 
         ## Blender doesn't support points as meshes, so create a very small circle as a control point and aim the bone at the circle.  
@@ -261,7 +339,7 @@ class BasicAnimationQuestions():
         bones = []
         for eye in eyes:
             self.worldUtils.DeselectAll()
-            bone = self.skelUtils.AddArmitureToMesh(character[eye])
+            bone = self.skelUtils.AddNewArmatureToMesh(character[eye])
             self.worldUtils.SetSceneKeysToObjectDataNames()
             bpy.ops.object.constraint_add(type='TRACK_TO')
             bpy.context.object.constraints["Track To"].target = self.worldUtils.GetWorldObjectFromObject(reticle)
@@ -270,7 +348,28 @@ class BasicAnimationQuestions():
         ## update the character hash to include the bones.
         character['bones'] = bones
         return(character)
+
+    ## How do I bend a tube?  Adapted from https://www.youtube.com/watch?v=jw30S-Oepyo
+    def HowDoIBendATube(self):
+        self.meshUtils.DeleteAllMeshObjects()
+        cylinderHeight = 10
+        ## step -- create a tube and add enough points to the mesh for good bending.
+        tube = self.meshPrims.Cylinder(r=1, h=cylinderHeight)
+        self.meshUtils.IncreaseVertexCount(mesh=tube, level=3)
+
+        ## step -- create an Armature with 5 bones in it
+        armature = self.skelUtils.CreateArmature() ## start with 1 bone, not attached to the mesh
+        self.worldUtils.ScaleSelectedObject((1, 1, cylinderHeight)) ## armatures start off 1 unit tall -- let's make it the same height as the cylinder.
+        self.skelUtils.Subdivide(armature, count=4)
+
+        ## step -- place the armature inside the mesh
+
+        ## step -- scale the armature to fit the mesh vertically
+
+        pass
     
+
+
     ## How do I squish a ball?
     def HowdDoISquishABall(self):
         ## step 1 -- create a ball and a bone
@@ -290,4 +389,5 @@ class BasicAnimationQuestions():
 ## run the question
 q = BasicAnimationQuestions()
 #q.HowDoIAnimateEyes()
-q.HowdDoISquishABall()
+q.HowDoIBendATube()
+#q.HowdDoISquishABall()
