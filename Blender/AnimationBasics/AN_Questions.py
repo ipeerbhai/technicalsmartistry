@@ -186,11 +186,7 @@ class SkeletonUtilities():
         Armature = bpy.context.object.data
         bpy.context.selected_objects[0].name = Armature.name
 
-        ## select the mesh and the Armature
-        self.worldUtils.SelectItems([mesh, Armature])
-
-        ## Parent the mesh to the Armature
-        bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+        self.BindExistingArmatureToMesh(Armature, mesh)
         return(Armature)
     
     ## Subdivide makes a single armature/bone into many linear bones.
@@ -205,6 +201,11 @@ class SkeletonUtilities():
 
     ## BindExistingArmatureToMesh binds an existing armature to a mesh
     def BindExistingArmatureToMesh(self, armature, mesh):
+         ## select the mesh and the Armature
+        self.worldUtils.SelectItems([mesh, armature])
+
+        ## Parent the mesh to the Armature
+        bpy.ops.object.parent_set(type='ARMATURE_AUTO')
         pass
 
 ## A class to help add/create textures to a mesh
@@ -293,6 +294,11 @@ class WorldUtilities():
         bpy.ops.object.mode_set()
         pass
 
+    ## TranslateSelected will translate the selected objects
+    def TransateSelected(self, translate_displacement=(0, 0, 0)):
+        bpy.ops.transform.translate(value=translate_displacement)
+        pass
+
      
 ###
 ## Main Questions
@@ -363,8 +369,12 @@ class BasicAnimationQuestions():
         self.skelUtils.Subdivide(armature, count=4)
 
         ## step -- place the armature inside the mesh
+        self.worldUtils.TransateSelected((0, 0, -cylinderHeight/2))
 
-        ## step -- scale the armature to fit the mesh vertically
+        ## step -- skin the mesh
+        self.skelUtils.BindExistingArmatureToMesh(armature, tube)
+
+        ## step -- add an IK control bone to the armature
 
         pass
     
