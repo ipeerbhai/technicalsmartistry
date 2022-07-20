@@ -208,6 +208,20 @@ class SkeletonUtilities():
         bpy.ops.object.parent_set(type='ARMATURE_AUTO')
         pass
 
+    ## ExtrudeBoneFromArmature extrudes a single bone from the armatrue in the Z direction
+    def ExtrudeBoneFromArmature(self, armature, length=1):
+        self.worldUtils.SetObjectMode()
+        self.worldUtils.SelectItems([armature])
+        lastBone = len(armature.bones) - 1
+        armature.bones[lastBone].select_tail=True
+        bpy.ops.object.editmode_toggle() ## this actually runs the select for the tail of the bone
+
+        ## extrude a new bone
+        newBone = bpy.ops.armature.extrude_move(ARMATURE_OT_extrude={"forked":False}, TRANSFORM_OT_translate={"value":(0, 0, length), "orient_axis_ortho":'X', "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, True), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
+
+        pass
+
+
 ## A class to help add/create textures to a mesh
 class TextureUtilities():
 
@@ -371,8 +385,11 @@ class BasicAnimationQuestions():
         ## step -- place the armature inside the mesh
         self.worldUtils.TransateSelected((0, 0, -cylinderHeight/2))
 
+        ## extrude a bone from the tail and name that bone IK
+        ikBone = self.skelUtils.ExtrudeBoneFromArmature(armature, length=0.25)
+
         ## step -- skin the mesh
-        self.skelUtils.BindExistingArmatureToMesh(armature, tube)
+        #self.skelUtils.BindExistingArmatureToMesh(armature, tube)
 
         ## step -- add an IK control bone to the armature
 
