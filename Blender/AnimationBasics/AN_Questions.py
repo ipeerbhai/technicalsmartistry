@@ -209,28 +209,64 @@ class SkeletonUtilities():
         pass
 
     ## ExtrudeBoneFromArmature extrudes a single bone from the armatrue in the Z direction
-    def ExtrudeBoneFromArmature(self, armature, length=1):
+    def ExtrudeBoneFromArmatureAndEdit(self, armature, length=1):
         self.worldUtils.SetObjectMode()
         self.worldUtils.SelectItems([armature])
-        lastBone = len(armature.bones) - 1
-        armature.bones[lastBone].select_tail=True
-        bpy.ops.object.editmode_toggle() ## this actually runs the select for the tail of the bone
 
-        ## extrude a new bone
-        newBone = bpy.ops.armature.extrude_move(ARMATURE_OT_extrude={"forked":False}, TRANSFORM_OT_translate={"value":(0, 0, length), "orient_axis_ortho":'X', "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, True), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
+        ## Change to edit mode and select nothing.
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.armature.select_all(action='DESELECT')
+        
+        ## Get the bone I want to extrude another bone from, and select the tail by edit mode foolishness (IMHO, this is a bug).
+        lastBone = armature.bones[len(armature.bones)-1]
+        bpy.ops.object.editmode_toggle()
+        lastBone.select_tail = True
+        bpy.ops.object.editmode_toggle()
+        
+        ## extrude a bone 1 unit vertically constrained on Z from this selected tail
+        bpy.ops.armature.extrude_move(ARMATURE_OT_extrude={"forked":False}, TRANSFORM_OT_translate={"value":(0, 0, 1), "orient_axis_ortho":'X', "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, True), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
+        
+        ## this extruded bone is now the active object, capture a reference to it before I lose it.
+        newBone = bpy.context.active_bone
 
+        ## deslect all, go back to object mode and return
+        bpy.ops.armature.select_all(action='DESELECT')
+        return (newBone)
+
+    ## SelectSingleBoneForEdit selects a single bone and puts in edit mode.
+    def SelectSingleBoneForEdit(self, armature, boneName):
+        ## setup no selection, then select the armature
+        self.worldUtils.SetObjectMode()
+        self.worldUtils.SelectItems([armature])
+
+        ## enter edit mode and select no bones at all
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.armature.select_all(action='DESELECT')
+        bpy.ops.object.editmode_toggle()
+
+        ## select the bone and re-enter edit mode
+        armature.bones[boneName].select=True
+        bpy.ops.object.editmode_toggle()
         pass
+
+
+    
+
+
+
+
+
 
 
 ## A class to help add/create textures to a mesh
 class TextureUtilities():
 
-    ## AddGeneratedUVMap adds a blender-created UV map to a mesh.
+    ## AddGeneratedUVMap adds a blender-created "smart UV" map to a mesh.
     def AddGeneratedUVMap(self, mesh):
         pass
 
-    ## CreatePaintablePBR creates a basic paintable mesh with base color and base texture resolution.
-    def CreatePaintablePBR(self, mesh, colorCode="#ffffff", resolution=(1024, 1024)):
+    ## CreatePBRMaterialForMesh creates a basic paintable material with base color and base texture resolution.
+    def CreatePBRMaterialForMesh(self, mesh, colorCode="#ffffff", resolution=(1024, 1024)):
         pass
 
 ## Some basic utilites that apply to the basic world
@@ -373,6 +409,7 @@ class BasicAnimationQuestions():
     def HowDoIBendATube(self):
         self.meshUtils.DeleteAllMeshObjects()
         cylinderHeight = 10
+
         ## step -- create a tube and add enough points to the mesh for good bending.
         tube = self.meshPrims.Cylinder(r=1, h=cylinderHeight)
         self.meshUtils.IncreaseVertexCount(mesh=tube, level=3)
@@ -385,14 +422,37 @@ class BasicAnimationQuestions():
         ## step -- place the armature inside the mesh
         self.worldUtils.TransateSelected((0, 0, -cylinderHeight/2))
 
-        ## extrude a bone from the tail and name that bone IK
-        ikBone = self.skelUtils.ExtrudeBoneFromArmature(armature, length=0.25)
+        ## save the name of the final bone.
+        lastBoneName = armature.bones[len(armature.bones)-1].name ## the actual object changes underneath internal to blender, and we can't be sure this object will remain the one we want.
+
+        ## extrude a bone from the tail, name that bone IK, make it a non-deforming bone, and clear its parent.
+        ikBone = self.skelUtils.ExtrudeBoneFromArmatureAndEdit(armature, length=1) ## this put me into armature edit mode.
+        ikBone.name = 'IK'
+        ikBone.use_deform = False
+        finalDeformBone = ikBone.parent
+        ikBone.parent = None
+
+        ## clear the parent, exit edit mode
+        bpy.ops.armature.parent_clear(type='CLEAR')
+        bpy.ops.object.editmode_toggle()
+
+        ## Complex step -- setup the armature to use the ikBone for inverse kinematics via constraints.
+        self.skelUtils.SelectSingleBoneForEdit(armature, lastBoneName)
+
+        ## change to pose mode from previous edit mode ( still in complex step )
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.object.posemode_toggle()
+
+        ## add an IK contstraint and set some poorly documented properties
+        armatureAsSceneType = self.worldUtils.GetWorldObjectFromObject(armature)
+        ikConstraint = armatureAsSceneType.pose.bones[lastBoneName].constraints.new("IK")
+        ikConstraint.target = self.worldUtils.GetWorldObjectFromObject(armature)
+        ikConstraint.subtarget = ikBone.name
+        ikConstraint.use_stretch = False
+        bpy.ops.object.posemode_toggle()
 
         ## step -- skin the mesh
-        #self.skelUtils.BindExistingArmatureToMesh(armature, tube)
-
-        ## step -- add an IK control bone to the armature
-
+        self.skelUtils.BindExistingArmatureToMesh(armature, tube)
         pass
     
 
@@ -413,8 +473,27 @@ class BasicAnimationQuestions():
  
         pass
 
-## run the question
+## run the questions
 q = BasicAnimationQuestions()
-#q.HowDoIAnimateEyes()
-q.HowDoIBendATube()
-#q.HowdDoISquishABall()
+# q.HowDoIAnimateEyes() ## learn basic object tracking via bones -- done!
+q.HowDoIBendATube() ## Learn basic IK for an object via bones and a control bone -- done!
+# q.HowdDoISquishABall() ## learn how to apply shapes to bones
+# q.HowDoIAnimateATentacle() ## learn IK, shape bones, rotation and noise constraints.
+# q.HowDoIBendALeg() ## Learn how to use IK, FK, and poles together to make "plastic doll" motion
+# q.HowDoIMoveLips() ## Learn how to use blends/morphs to move lips to the A and O visemes
+# q.HowDoIInsertKeyFrames() ## How do I add a keyframe?
+# q.HowDoIchangeSCurves() ## How do I modify the acceleration interpolation curve implied between keyframes?
+# q.ProjectBoundBallWithTailUpStairsMovie() ## Tie all this together to make a video of a sentient ball that has a tail bouncing up some stairs.
+
+## What I've learned along the way
+# Blender has bones.  Bones can be of different types -- deformation bones, control bones, and helper bones.
+# Armatures are collections of bones that can be bound to a mesh.
+# Bone Constraints are how you configure bones to enable motion plans.
+# Meshes can only deform in "Pose Mode" -- you can't move items around in object or edit mode.
+# IK Constraint is inverse kinematics, and it solves the deform backwards to hit a target point.
+# FK constraint is forward kinematics, and it solves positioning of bones down the chain if that bone moved a certain way.
+# IK can have a pole constraint, which restricts rotation of the object around the X axis.
+# The axis of constraint is always local x, not global X, in an IK Pole constraint, but the bone can have its own origin tranform matrix, so X can be aligned to any direction locally.
+
+## Useful videos to watch from here
+## https://www.youtube.com/watch?v=suP14lYWpN8 -- learn how to animate a leg rig
