@@ -446,7 +446,7 @@ class BasicAnimationQuestions():
         ## add an IK contstraint and set some poorly documented properties
         armatureAsSceneType = self.worldUtils.GetWorldObjectFromObject(armature)
         ikConstraint = armatureAsSceneType.pose.bones[lastBoneName].constraints.new("IK")
-        ikConstraint.target = self.worldUtils.GetWorldObjectFromObject(armature)
+        ikConstraint.target = armatureAsSceneType
         ikConstraint.subtarget = ikBone.name
         ikConstraint.use_stretch = False
         bpy.ops.object.posemode_toggle()
