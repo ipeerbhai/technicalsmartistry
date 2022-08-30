@@ -457,31 +457,43 @@ class BasicAnimationQuestions():
     
 
 
-    ## How do I squish a ball?
+    ## How do I squish a ball? Adapted from https://www.youtube.com/watch?v=1LIH_T3irRY
     def HowdDoISquishABall(self):
-        ## step 1 -- create a ball and a bone
+        ## step 1 -- create a ball and a bone and place the ball on the ground, add a full length bone
         ball = self.meshPrims.IcoSphere()
-        bone = self.skelUtils.CreateBone()
+        self.worldUtils.TransateSelected((0, 0, 1))
+        armature = self.skelUtils.CreateArmature()
+        lastBoneName = armature.bones[0].name
 
-        ## step 2 -- figure out how to assign weights to vertices.
-        self.worldUtils.SelectItems([ball, bone])
+        # enter edit mode, set the bone length to 2.  You can't directly set bone.length, because the struct is readonly
+        self.worldUtils.DeselectAll()
+        self.skelUtils.SelectSingleBoneForEdit(armature, lastBoneName)
+        bpy.context.active_bone.length = 2
+        bpy.ops.object.editmode_toggle()
+
+
+        ## step 2 -- Assign weights.
+        self.worldUtils.DeselectAll()
+        self.worldUtils.SelectItems([ball, armature])
         bpy.ops.object.parent_set(type='ARMATURE_AUTO')
 
-        ## how do I figure out the vertex weights?
-        ## maybe something to do with the bpy.types.VertexGroup class?
+        ## step 3 -- add a maintain volume object constraint to the armature with a free Z axis.
+        self.worldUtils.SelectItems([armature])
+        bpy.ops.object.constraint_add(type='MAINTAIN_VOLUME')
+        bpy.context.object.constraints["Maintain Volume"].free_axis = 'SAMEVOL_Z'
 
- 
-        pass
+        ## I can now set the scale of the bone to squash and stretch the ball!
+        return(ball, armature)
 
 ## run the questions
 q = BasicAnimationQuestions()
 # q.HowDoIAnimateEyes() ## learn basic object tracking via bones -- done!
-q.HowDoIBendATube() ## Learn basic IK for an object via bones and a control bone -- done!
-# q.HowdDoISquishABall() ## learn how to apply shapes to bones
+# q.HowDoIBendATube() ## Learn basic IK for an object via bones and a control bone -- done!
+# q.HowdDoISquishABall() ## learn how to squash/stretch via bones
+q.HowDoIInsertKeyFrames() ## How do I add a keyframe?
 # q.HowDoIAnimateATentacle() ## learn IK, shape bones, rotation and noise constraints.
 # q.HowDoIBendALeg() ## Learn how to use IK, FK, and poles together to make "plastic doll" motion
 # q.HowDoIMoveLips() ## Learn how to use blends/morphs to move lips to the A and O visemes
-# q.HowDoIInsertKeyFrames() ## How do I add a keyframe?
 # q.HowDoIchangeSCurves() ## How do I modify the acceleration interpolation curve implied between keyframes?
 # q.ProjectBoundBallWithTailUpStairsMovie() ## Tie all this together to make a video of a sentient ball that has a tail bouncing up some stairs.
 
