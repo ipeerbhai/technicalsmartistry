@@ -36,7 +36,7 @@ node_environment.image = bpy.data.images.load("C:/github/technicalsmartistry/Ble
 
 ### Advanced -- change the XYZ position of the EXR
 node_vector = tree_nodes.new(type='ShaderNodeMapping')
-node_vector.location = -500, 0 ## this is the location of the node in the node graph, not the input location!!!!
+node_vector.location = -500, 0 ## this is the location of the node in the node graph, not the HDR/EXR file position!!!!
 
 ## to set the vector node's input properties, we refer to it by array positions.  So Input[0][0] is the "vector" 0,0 in the input set.
 node_vector.inputs['Location'].default_value[0] = 0 ## X position

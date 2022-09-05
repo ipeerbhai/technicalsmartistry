@@ -249,14 +249,27 @@ class SkeletonUtilities():
         bpy.ops.object.editmode_toggle()
         pass
 
+## A class to help deal with time/Keyframes
+class TimeKeys():
+    def __init__(self) -> None:
+        ## init the FPS numerator and denominator, compute the frames per second rate
+        bpy.context.scene.render.fps = 24
+        bpy.context.scene.render.fps_base = 1.0
+        self.Rate = bpy.context.scene.render.fps / bpy.context.scene.render.fps_base 
+        pass
 
-    
+    # SetFPSParameters sets the parameters to create a frames per second rate.
+    def SetFPSParameters(self, fpsNumerator=24, fpsDenominator=1.0) -> None:
+        bpy.context.scene.render.fps = fpsNumerator
+        bpy.context.scene.render.fps_base = fpsDenominator
+        self.Rate = bpy.context.scene.render.fps / bpy.context.scene.render.fps_base
+        pass
 
-
-
-
-
-
+    # SetTimeLength sets how many frames we get in whole seconds
+    def SetTimeLength(self, seconds=10) -> None:
+        howManyFrames = self.Rate * seconds
+        bpy.context.scene.frame_end = howManyFrames
+        pass
 
 ## A class to help add/create textures to a mesh
 class TextureUtilities():
