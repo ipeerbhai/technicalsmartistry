@@ -18,6 +18,12 @@ class SubSurfModifierMethods(Enum):
     Simple = 'SIMPLE'
     CatmullCkark = 'CATMULL_CLARK'
 
+## DataPaths is an enum for keyframes.  You also have bone data paths and custom properties, not currently enumerated.
+class DataPaths(Enum):
+    location='location'
+    rotation='rotation'
+    scale='scale'
+
 ## Notes ##
 # Scale is "resize" in blender's API.
 
@@ -39,7 +45,7 @@ class MeshUtilities():
 
     ## DeleteAllMeshObjects deletes all objects of type 'MESH'
     def DeleteAllMeshObjects(self):
-        ## We want to be in object mode and select all
+        # We want to be in object mode and select all
         if bpy.context.object == None:
             return
         match bpy.context.object.mode:
@@ -50,12 +56,12 @@ class MeshUtilities():
 
         bpy.ops.object.select_all(action='SELECT')
         
-        ## deselect anything that isn't a mesh
+        # deselect anything that isn't a mesh
         for selectedObject in bpy.context.selected_objects:
             if selectedObject.type != "MESH":
                 selectedObject.select_set(False)
         
-        ## delete all selected objects.
+        # delete all selected objects.
         bpy.ops.object.delete(use_global=False, confirm=False)
         pass
 
@@ -72,7 +78,7 @@ class MeshUtilities():
         for thisResult in rs:
             vertexIndices.append(thisResult[1])
 
-        ## select the vertices
+        # select the vertices
         self.SelectVerticesByIndex(dataItem, vertexIndices)
         pass
 
@@ -84,17 +90,17 @@ class MeshUtilities():
     ##  Meshes are lists of points, loops, and faces.  Each list is a 0 indexed array.
     ##  Various functions will give us a list of vertex indices -- we can use those lists to select the vertices for further edits.
     def SelectVerticesByIndices(self, dataItem=None, vertexIndices=[]):
-        ## Get the bmesh object from edit mode 
+        # Get the bmesh object from edit mode 
         if bpy.context.object.mode != 'EDIT':
             bpy.ops.object.editmode_toggle()
         bm = bmesh.from_edit_mesh(dataItem)
         
-        ## select the found target vertex
+        # select the found target vertex
         for targetVertexIndex in vertexIndices:
             bm.verts.ensure_lookup_table()
             bm.verts[targetVertexIndex].select_set(True)
             
-        ## To update blender's UX with the selection change, we need to flush and update
+        # To update blender's UX with the selection change, we need to flush and update
         bm.select_mode |= {'VERT'}
         bm.select_flush_mode()
         bmesh.update_edit_mesh(dataItem)
@@ -157,7 +163,7 @@ class SkeletonUtilities():
         pass
 
     def CreateArmature(self, type=BoneTypes.Deform):
-        ## create an Armature
+        # create an Armature
         self.worldUtils.DeselectAll()
         bpy.ops.object.armature_add(enter_editmode=False, align='WORLD')
         bone = bpy.context.object.data
@@ -170,7 +176,7 @@ class SkeletonUtilities():
         allObjects = bpy.data.scenes['Scene'].objects
         for object in allObjects:
             if object.type == 'ARMATURE':
-                ## select the object
+                # select the object
                 object.select_set(True)
         self.worldUtils.DeleteSelected()
         pass
@@ -178,11 +184,11 @@ class SkeletonUtilities():
     ## AddNewArmatureToMesh adds a single Armature/bone to a mesh at the center of the mesh and auto-weights mesh vertices to it.
     def AddNewArmatureToMesh(self, mesh, boneSize=(1, 1, 1)):
 
-        ## find the center of the mesh
+        # find the center of the mesh
         center = (bpy.data.objects[mesh.name].location.x, bpy.data.objects[mesh.name].location.y, bpy.data.objects[mesh.name].location.z)
         bpy.ops.object.armature_add(enter_editmode=False, align='WORLD', location=center, scale=boneSize)
         
-        ## Create the Armature and name it
+        # Create the Armature and name it
         Armature = bpy.context.object.data
         bpy.context.selected_objects[0].name = Armature.name
 
@@ -213,40 +219,51 @@ class SkeletonUtilities():
         self.worldUtils.SetObjectMode()
         self.worldUtils.SelectItems([armature])
 
-        ## Change to edit mode and select nothing.
+        # Change to edit mode and select nothing.
         bpy.ops.object.editmode_toggle()
         bpy.ops.armature.select_all(action='DESELECT')
         
-        ## Get the bone I want to extrude another bone from, and select the tail by edit mode foolishness (IMHO, this is a bug).
+        # Get the bone I want to extrude another bone from, and select the tail by edit mode foolishness (IMHO, this is a bug).
         lastBone = armature.bones[len(armature.bones)-1]
         bpy.ops.object.editmode_toggle()
         lastBone.select_tail = True
         bpy.ops.object.editmode_toggle()
         
-        ## extrude a bone 1 unit vertically constrained on Z from this selected tail
+        # extrude a bone 1 unit vertically constrained on Z from this selected tail
         bpy.ops.armature.extrude_move(ARMATURE_OT_extrude={"forked":False}, TRANSFORM_OT_translate={"value":(0, 0, 1), "orient_axis_ortho":'X', "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, True), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
         
-        ## this extruded bone is now the active object, capture a reference to it before I lose it.
+        # this extruded bone is now the active object, capture a reference to it before I lose it.
         newBone = bpy.context.active_bone
 
-        ## deslect all, go back to object mode and return
+        # deslect all, go back to object mode and return
         bpy.ops.armature.select_all(action='DESELECT')
         return (newBone)
 
     ## SelectSingleBoneForEdit selects a single bone and puts in edit mode.
     def SelectSingleBoneForEdit(self, armature, boneName):
-        ## setup no selection, then select the armature
+        # setup no selection, then select the armature
         self.worldUtils.SetObjectMode()
         self.worldUtils.SelectItems([armature])
 
-        ## enter edit mode and select no bones at all
+        # enter edit mode and select no bones at all
         bpy.ops.object.editmode_toggle()
         bpy.ops.armature.select_all(action='DESELECT')
         bpy.ops.object.editmode_toggle()
 
-        ## select the bone and re-enter edit mode
+        # select the bone and re-enter edit mode
         armature.bones[boneName].select=True
         bpy.ops.object.editmode_toggle()
+        pass
+
+## A class to help add/create textures to a mesh
+class TextureUtilities():
+
+    ## AddGeneratedUVMap adds a blender-created "smart UV" map to a mesh.
+    def AddGeneratedUVMap(self, mesh):
+        pass
+
+    ## CreatePBRMaterialForMesh creates a basic paintable material with base color and base texture resolution.
+    def CreatePBRMaterialForMesh(self, mesh, colorCode="#ffffff", resolution=(1024, 1024)):
         pass
 
 ## A class to help deal with time/Keyframes
@@ -268,25 +285,14 @@ class TimeKeys():
     # SetTimeLength sets how many frames we get in whole seconds
     def SetTimeLength(self, seconds=10) -> None:
         howManyFrames = self.Rate * seconds
-        bpy.context.scene.frame_end = howManyFrames
-        pass
-
-## A class to help add/create textures to a mesh
-class TextureUtilities():
-
-    ## AddGeneratedUVMap adds a blender-created "smart UV" map to a mesh.
-    def AddGeneratedUVMap(self, mesh):
-        pass
-
-    ## CreatePBRMaterialForMesh creates a basic paintable material with base color and base texture resolution.
-    def CreatePBRMaterialForMesh(self, mesh, colorCode="#ffffff", resolution=(1024, 1024)):
-        pass
+        bpy.context.scene.frame_end = int(howManyFrames)
+        return(howManyFrames)
 
 ## Some basic utilites that apply to the basic world
 class WorldUtilities():
 
-    ## ActivateObject sets the passed in object to active
-    ## The bpy.context.scene.active_object needs to be set to the data block of the active object?
+    # ActivateObject sets the passed in object to active
+    # The bpy.context.scene.active_object needs to be set to the data block of the active object?
     def ActivateObject(self, object):
         bpy.context.scene.active_object = object
         pass
@@ -338,6 +344,11 @@ class WorldUtilities():
          target = bpy.data.scenes[scene].objects.get(object.name)
          return(target)
 
+    ## def GetObjectByName gives us a bpy.data.objects instance and searches by name
+    def GetObjectByName(self, name, scene='Scene'):
+        target = bpy.data.scenes[scene].objects.get(name)
+        return(target)
+
     ## HideObjectFromRender hides an object from being rendered in a full render, but shows in viewport.
     def HideObjectFromRender(self, object):
         worldRef = self.GetWorldObjectFromObject(object)
@@ -364,7 +375,7 @@ class WorldUtilities():
 
      
 ###
-## Main Questions
+## Main Questions -- just stuff I want to figure out how to do.
 ###
 
 class BasicAnimationQuestions():
@@ -374,7 +385,7 @@ class BasicAnimationQuestions():
         self.meshUtils = MeshUtilities()
         self.skelUtils = SkeletonUtilities()
 
-        ## clean up the world
+        # clean up the world
         self.meshUtils.DeleteAllMeshObjects()
         self.skelUtils.DeleteAllArmatureObjects()
         self.worldUtils.SetupWorld()
@@ -392,18 +403,18 @@ class BasicAnimationQuestions():
 
     ## How do I use what I know to animate two eyes tracking something?
     def HowDoIAnimateEyes(self):
-        ## clear everything, draw the character, create a bone, and parent an eye to the created bone.
+        # clear everything, draw the character, create a bone, and parent an eye to the created bone.
         self.meshUtils.DeleteAllMeshObjects()
         self.skelUtils.DeleteAllArmatureObjects()
         character = self.CreateHeadMeshes()
 
-        ## Blender doesn't support points as meshes, so create a very small circle as a control point and aim the bone at the circle.  
+        # Blender doesn't support points as meshes, so create a very small circle as a control point and aim the bone at the circle.  
         reticle = self.meshPrims.Circle(radius=0.01, location=(0, 0, 5))
         reticle.name = 'Reticle'
         self.worldUtils.SetSceneKeysToObjectDataNames()
         self.worldUtils.HideObjectFromRender(reticle)
 
-        ## add a bone to each eye and a tracking constraint to the bone.
+        # add a bone to each eye and a tracking constraint to the bone.
         eyes = ['leftEye', 'rightEye']
         bones = []
         for eye in eyes:
@@ -414,7 +425,7 @@ class BasicAnimationQuestions():
             bpy.context.object.constraints["Track To"].target = self.worldUtils.GetWorldObjectFromObject(reticle)
             bones.append(bone)
         
-        ## update the character hash to include the bones.
+        # update the character hash to include the bones.
         character['bones'] = bones
         return(character)
 
@@ -423,40 +434,40 @@ class BasicAnimationQuestions():
         self.meshUtils.DeleteAllMeshObjects()
         cylinderHeight = 10
 
-        ## step -- create a tube and add enough points to the mesh for good bending.
+        # step -- create a tube and add enough points to the mesh for good bending.
         tube = self.meshPrims.Cylinder(r=1, h=cylinderHeight)
         self.meshUtils.IncreaseVertexCount(mesh=tube, level=3)
 
-        ## step -- create an Armature with 5 bones in it
+        # step -- create an Armature with 5 bones in it
         armature = self.skelUtils.CreateArmature() ## start with 1 bone, not attached to the mesh
         self.worldUtils.ScaleSelectedObject((1, 1, cylinderHeight)) ## armatures start off 1 unit tall -- let's make it the same height as the cylinder.
         self.skelUtils.Subdivide(armature, count=4)
 
-        ## step -- place the armature inside the mesh
+        # step -- place the armature inside the mesh
         self.worldUtils.TransateSelected((0, 0, -cylinderHeight/2))
 
-        ## save the name of the final bone.
+        # save the name of the final bone.
         lastBoneName = armature.bones[len(armature.bones)-1].name ## the actual object changes underneath internal to blender, and we can't be sure this object will remain the one we want.
 
-        ## extrude a bone from the tail, name that bone IK, make it a non-deforming bone, and clear its parent.
+        # extrude a bone from the tail, name that bone IK, make it a non-deforming bone, and clear its parent.
         ikBone = self.skelUtils.ExtrudeBoneFromArmatureAndEdit(armature, length=1) ## this put me into armature edit mode.
         ikBone.name = 'IK'
         ikBone.use_deform = False
         finalDeformBone = ikBone.parent
         ikBone.parent = None
 
-        ## clear the parent, exit edit mode
+        # clear the parent, exit edit mode
         bpy.ops.armature.parent_clear(type='CLEAR')
         bpy.ops.object.editmode_toggle()
 
         ## Complex step -- setup the armature to use the ikBone for inverse kinematics via constraints.
         self.skelUtils.SelectSingleBoneForEdit(armature, lastBoneName)
 
-        ## change to pose mode from previous edit mode ( still in complex step )
+        # change to pose mode from previous edit mode ( still in complex step )
         bpy.ops.object.editmode_toggle()
         bpy.ops.object.posemode_toggle()
 
-        ## add an IK contstraint and set some poorly documented properties
+        # add an IK contstraint and set some poorly documented properties
         armatureAsSceneType = self.worldUtils.GetWorldObjectFromObject(armature)
         ikConstraint = armatureAsSceneType.pose.bones[lastBoneName].constraints.new("IK")
         ikConstraint.target = armatureAsSceneType
@@ -464,15 +475,13 @@ class BasicAnimationQuestions():
         ikConstraint.use_stretch = False
         bpy.ops.object.posemode_toggle()
 
-        ## step -- skin the mesh
+        ## step -- skin the mesh and finish up
         self.skelUtils.BindExistingArmatureToMesh(armature, tube)
         pass
     
-
-
     ## How do I squish a ball? Adapted from https://www.youtube.com/watch?v=1LIH_T3irRY
     def HowdDoISquishABall(self):
-        ## step 1 -- create a ball and a bone and place the ball on the ground, add a full length bone
+        # step 1 -- create a ball and a bone and place the ball on the ground, add a full length bone
         ball = self.meshPrims.IcoSphere()
         self.worldUtils.TransateSelected((0, 0, 1))
         armature = self.skelUtils.CreateArmature()
@@ -485,18 +494,36 @@ class BasicAnimationQuestions():
         bpy.ops.object.editmode_toggle()
 
 
-        ## step 2 -- Assign weights.
+        # step 2 -- Assign weights.
         self.worldUtils.DeselectAll()
         self.worldUtils.SelectItems([ball, armature])
         bpy.ops.object.parent_set(type='ARMATURE_AUTO')
 
-        ## step 3 -- add a maintain volume object constraint to the armature with a free Z axis.
+        # step 3 -- add a maintain volume object constraint to the armature with a free Z axis.
         self.worldUtils.SelectItems([armature])
         bpy.ops.object.constraint_add(type='MAINTAIN_VOLUME')
         bpy.context.object.constraints["Maintain Volume"].free_axis = 'SAMEVOL_Z'
 
-        ## I can now set the scale of the bone to squash and stretch the ball!
+        # I can now set the scale of the bone to squash and stretch the ball!
         return(ball, armature)
+
+    ## HowDoIInsertKeyFrames attempts to figure out how to insert keyframes for an object.  I'll just move a sphere around.
+    def HowDoIInsertKeyFrames(self) -> None:
+        # figure out how many frames I have for 10 seconds of video.
+        tk = TimeKeys()
+        frameCount = tk.SetTimeLength(1)
+        self.meshUtils.DeleteAllMeshObjects()
+      
+        # create a sphere at 0, 0, 0; add a keyframe at frame 1
+        sphereData = self.meshPrims.IcoSphere()
+        sphere = self.worldUtils.GetWorldObjectFromObject(sphereData)
+        sphere.location = 0, 0, 0
+        sphere.keyframe_insert(data_path=DataPaths.location.value, frame=1)
+
+        # move the sphere to a new location and insert the next keyframe at frame 24
+        sphere.location = 10, 0, 0
+        sphere.keyframe_insert(data_path=DataPaths.location.value, frame=24)
+        pass
 
 ## run the questions
 q = BasicAnimationQuestions()
